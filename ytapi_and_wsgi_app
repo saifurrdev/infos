@@ -1,0 +1,55 @@
+https://nagarpalikaharda.org/apiyt/?url=https://youtu.be/4z6Mv2QqOSg?si=K-TJ8b1kUj0KEO0e
+
+
+import os
+import sys
+import json
+from yt_dlp import YoutubeDL
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+def parse_query_string(query):
+    params = {}
+    for qc in query.split("&"):
+        if "=" in qc:
+            k, v = qc.split("=", 1)
+            params[k] = v
+    return params
+
+def application(environ, start_response):
+    try:
+        query = environ.get("QUERY_STRING", "")
+        params = parse_query_string(query)
+
+        url = params.get("url")
+        media_type = params.get("type", "video")
+
+        if not url:
+            response = {"success": False, "error": "Missing ?url= parameter"}
+        elif media_type not in ["video", "audio"]:
+            response = {"success": False, "error": "Invalid type (use video|audio)"}
+        else:
+            ydl_opts = {
+                "format": "bestaudio/best" if media_type == "audio" else "best",
+                "quiet": True,
+                "no_warnings": True,
+            }
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                response = {
+                    "success": True,
+                    "direct_url": info.get("url"),
+                    "thumbnail": info.get("thumbnail"),
+                    "title": info.get("title"),
+                    "uploader": info.get("uploader"),
+                    "duration": info.get("duration"),
+                    "view_count": info.get("view_count"),
+                    "type": media_type,
+                }
+
+    except Exception as e:
+        response = {"success": False, "error": str(e)}
+
+    # WSGI response
+    start_response("200 OK", [("Content-Type", "application/json")])
+    return [json.dumps(response).encode("utf-8")]
